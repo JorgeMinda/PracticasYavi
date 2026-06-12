@@ -1,6 +1,7 @@
 export interface ResultadoAprendizaje {
   id: number;
-  descripcion: string;
-  areaId?: number;        // ← Nuevo: a qué área pertenece
-  semanasNecesarias?: number; // ← Opcional: cuántas semanas necesita
+  descripcion: string;        // ← Volvemos a descripcion para no romper las tablas ni modales
+  areaId?: number;            
+  semanasNecesarias?: number; 
+  result?: string;            // Opcional por si acaso lo necesitas
 }

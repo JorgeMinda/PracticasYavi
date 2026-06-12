@@ -1,23 +1,26 @@
 import { ScrollView, View, Text } from "react-native";
 import FilaCronograma from "./FilaCronograma";
+import { AreaPractica } from "../../../types/area";
 
 interface Semana {
   numero: number;
-  fechaInicio: Date;
-  fechaFin: Date;
   rango: string;
 }
 
 interface Props {
-  areas: Array<{ id: number | string; nombre: string }>;
+  areas: AreaPractica[];
+  opcionesDisponibles: AreaPractica[];
   semanas: Semana[];
-  resultados: any[];           // ← Agregar esta prop
+  resultados: any[];
+  onCambiarArea: (index: number, nuevaArea: AreaPractica) => void;
 }
 
-export default function TablaCronograma({ 
-  areas, 
-  semanas, 
-  resultados = [] 
+export default function TablaCronograma({
+  areas,
+  opcionesDisponibles,
+  semanas,
+  resultados = [],
+  onCambiarArea,
 }: Props) {
   if (semanas.length === 0) {
     return (
@@ -34,17 +37,16 @@ export default function TablaCronograma({
       <Text className="text-2xl font-bold text-gray-900 mb-4 px-2">
         Cronograma de Rotación
       </Text>
- {/* Título de la sección del Cronograma */}
-        <View className="flex-row justify-between items-center px-1">
-         
-          <Text className="font-semibold text-gray-700">
-            Total semanas: {semanas.length}
-          </Text>
-        </View>
+      
+      <View className="flex-row justify-between items-center px-1 mb-2">
+        <Text className="font-semibold text-gray-700">
+          Total semanas: {semanas.length}
+        </Text>
+      </View>
 
-      <ScrollView 
-        horizontal 
-        showsHorizontalScrollIndicator={false} 
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
         className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm"
       >
         <View>
@@ -67,13 +69,16 @@ export default function TablaCronograma({
             ))}
           </View>
 
-          {/* Filas */}
-          {areas.map((area) => (
+          {/* Filas interactivos */}
+          {areas.map((area, index) => (
             <FilaCronograma
-              key={area.id}
+              key={`${area.id}-${index}`}
               area={area}
+              indexFila={index}
+              opcionesDisponibles={opcionesDisponibles}
               semanas={semanas}
-              resultados={resultados}        // ← Aquí se pasa
+              resultados={resultados}
+              onCambiarArea={onCambiarArea}
             />
           ))}
         </View>

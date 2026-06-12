@@ -1,17 +1,40 @@
-// 1. Cambiamos el import para usar apiSupabase
-import { apiSupabase } from "./api";
+import axios from "axios";
+
+// ==========================================
+// CONFIGURACIÓN DE INSTANCIAS (AXIOS)
+// ==========================================
+
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ0bGpvYWxhZHB5dGZudXFyeXVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwNDEyOTgsImV4cCI6MjA5NjYxNzI5OH0.Li0hnWB1qU3u_5G6Yy6VOv2nHJnrMJ6bqrcjeEYUJG0";
+
+export const apiLocal = axios.create({
+  baseURL: "http://192.168.3.19:3000",
+  timeout: 10000,
+  headers: {
+    "Content-Type": "application/json",
+  },
+});
+
+export const apiSupabase = axios.create({
+  baseURL: "https://ftljoaladpytfnuqryuq.supabase.co/rest/v1",
+  timeout: 10000,
+  headers: {
+    "Content-Type": "application/json",
+    "apikey": SUPABASE_ANON_KEY,
+    "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+  },
+});
 
 // ==========================================
 // EXPECTED ACHIEVEMENTS
 // ==========================================
 export const getExpectedAchievements = async () => {
-  const { data } = await apiSupabase.get("/expected_achievements"); // Nota el guion bajo "_" como está en tu SQL
+  const { data } = await apiSupabase.get("/expected_achievements");
   return data;
 };
 
 export const getExpectedAchievementById = async (id: number) => {
   const { data } = await apiSupabase.get(`/expected_achievements?id=eq.${id}`);
-  return data[0] || null; // Supabase devuelve un arreglo, tomamos el primer elemento
+  return data[0] || null;
 };
 
 export const createExpectedAchievement = async (body: any) => {
@@ -222,5 +245,33 @@ export const updateTrainingPlan = async (id: number, body: any) => {
 
 export const deleteTrainingPlan = async (id: number) => {
   const { data } = await apiSupabase.delete(`/training_plans?id=eq.${id}`);
+  return data;
+};
+
+// ==========================================
+// LEARNING LOGS
+// ==========================================
+export const getLearningLogs = async () => {
+  const { data } = await apiSupabase.get("/learning_logs");
+  return data;
+};
+
+export const getLearningLogById = async (id: number) => {
+  const { data } = await apiSupabase.get(`/learning_logs?id=eq.${id}`);
+  return data[0] || null;
+};
+
+export const createLearningLog = async (body: any) => {
+  const { data } = await apiSupabase.post("/learning_logs", body);
+  return data;
+};
+
+export const updateLearningLog = async (id: number, body: any) => {
+  const { data } = await apiSupabase.put(`/learning_logs?id=eq.${id}`, body);
+  return data;
+};
+
+export const deleteLearningLog = async (id: number) => {
+  const { data } = await apiSupabase.delete(`/learning_logs?id=eq.${id}`);
   return data;
 };
