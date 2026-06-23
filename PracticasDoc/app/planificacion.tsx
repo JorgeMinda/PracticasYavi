@@ -1,7 +1,10 @@
 import { useState, useEffect } from "react";
-import { ScrollView, Alert, View, Platform, StyleSheet, StyleProp, ViewStyle } from "react-native";
+import { ScrollView, Alert, View, Platform, StyleSheet, StyleProp, ViewStyle, TouchableOpacity, Text, ActivityIndicator } from "react-native";
 import { getLearningResults } from "../services/dataService";
 import { generarSemanas } from "../utils/generarSemanas";
+import * as Print from 'expo-print';
+
+import { createRotationPlan } from "../services/dataService";
 
 import PlanificacionHeader from "../components/common/planificacion/PlanificacionHeader";
 import ResultadoTable from "../components/common/planificacion/ResultadoTable";
@@ -13,224 +16,358 @@ import { Semana } from "../types/semana";
 import { AreaPractica } from "../types/area";
 
 const OPCIONES_AREAS: AreaPractica[] = [
-  { id: 1, nombre: "Diseño" },
-  { id: 2, nombre: "Investigación" },
-  { id: 3, nombre: "Desarrollo" },
-  { id: 4, nombre: "Tics" }, 
-  { id: 5, nombre: "Innovación" },
+    { id: 1, nombre: "Diseño" },
+    { id: 2, nombre: "Investigación" },
+    { id: 3, nombre: "Desarrollo" },
+    { id: 4, nombre: "Tics" },
+    { id: 5, nombre: "Innovación" },
 ];
 
 export default function PlanificacionScreen() {
-  const [fechaInicio, setFechaInicio] = useState<Date>(new Date());
-  const [semanas, setSemanas] = useState<Semana[]>([]);
-  const [modalVisible, setModalVisible] = useState(false);
-  const [resultados, setResultados] = useState<ResultadoAprendizaje[]>([]);
-  const [resultadosDisponibles, setResultadosDisponibles] = useState<ResultadoAprendizaje[]>([]);
+    const [fechaInicio, setFechaInicio] = useState<Date>(new Date());
+    const [semanas, setSemanas] = useState<Semana[]>([]);
+    const [modalVisible, setModalVisible] = useState<boolean>(false);
+    const [resultados, setResultados] = useState<ResultadoAprendizaje[]>([]);
+    const [resultadosDisponibles, setResultadosDisponibles] = useState<ResultadoAprendizaje[]>([]);
+    const [guardando, setGuardando] = useState<boolean>(false);
 
-  const [filasCronograma, setFilasCronograma] = useState<AreaPractica[]>([
-    { id: 4, nombre: "Tics" },
-    { id: 3, nombre: "Desarrollo" },
-    { id: 5, nombre: "Innovación" },
-  ]);
+    const [filasCronograma, setFilasCronograma] = useState<AreaPractica[]>([
+        { id: 4, nombre: "Tics" },
+        { id: 3, nombre: "Desarrollo" },
+        { id: 5, nombre: "Innovación" },
+    ]);
 
-  useEffect(() => {
-    cargarResultados();
-  }, []);
+    useEffect(() => {
+        cargarResultados();
+    }, []);
 
-  const cargarResultados = async () => {
-    try {
-      console.log("=== INICIANDO PETICIÓN A SUPABASE ===");
-      const data = await getLearningResults();
-      
-      const datosMapeados = (data || []).map((item: any) => ({
-        ...item,
-        descripcion: item.result || "Sin descripción disponible",
-      }));
-
-      setResultadosDisponibles(datosMapeados);
-    } catch (error) {
-      console.log(error);
-      Alert.alert("Error", "No se pudieron cargar los resultados de aprendizaje.");
-    }
-  };
-
-  const cambiarAreaDeFila = (indexFila: number, nuevaArea: AreaPractica) => {
-    const areaDuplicada = filasCronograma.some(
-      (fila, idx) => fila.id === nuevaArea.id && idx !== indexFila
-    );
-
-    if (areaDuplicada) {
-      Alert.alert(
-        "Área Duplicada",
-        `El área "${nuevaArea.nombre}" ya está asignada a otra fila del cronograma.`
-      );
-      return;
-    }
-
-    setFilasCronograma((prev) => {
-      const nuevasFilas = [...prev];
-      nuevasFilas[indexFila] = nuevaArea;
-      return nuevasFilas;
-    });
-  };
-
-  const agregarResultado = (resultado: ResultadoAprendizaje) => {
-    if (resultados.some((r) => r.id === resultado.id)) {
-      Alert.alert("Aviso", "Este resultado ya fue agregado");
-      return;
-    }
-
-    // Normalización de texto nativa libre de diacríticos/acentos
-    const descNormalizada = (resultado.descripcion || resultado.result || "")
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, ""); 
-
-    let areaId = 4; // Por defecto: Tics
-
-    // 📋 ENRUTAMIENTO INTELIGENTE SEGÚN TU LISTA REAL DE OBJETIVOS:
-    if (
-      descNormalizada.includes("diseno") || 
-      descNormalizada.includes("ui") || 
-      descNormalizada.includes("ux") ||
-      descNormalizada.includes("interfaz")
-    ) {
-      areaId = 1; // Diseño
-    } 
-    else if (
-      descNormalizada.includes("investig") || 
-      descNormalizada.includes("diagnostico")
-    ) {
-      areaId = 2; // Investigación
-    } 
-    else if (
-      descNormalizada.includes("agil") || 
-      descNormalizada.includes("innov") || 
-      descNormalizada.includes("arquitectura") ||
-      descNormalizada.includes("defensa") || // "Defensa de Proyecto" se categoriza aquí
-      descNormalizada.includes("empresarial")
-    ) {
-      areaId = 5; // Innovación
-    } 
-    else if (
-      descNormalizada.includes("movil") || 
-      descNormalizada.includes("nat") || 
-      descNormalizada.includes("api") || 
-      descNormalizada.includes("rest") ||
-      descNormalizada.includes("base de datos") ||
-      descNormalizada.includes("typeorm") ||
-      descNormalizada.includes("postgres") ||
-      descNormalizada.includes("nestjs") ||
-      descNormalizada.includes("jwt") ||
-      descNormalizada.includes("autenticacion") ||
-      descNormalizada.includes("programacion")
-    ) {
-      areaId = 3; // Desarrollo
-    }
-
-    const areaAsociada = OPCIONES_AREAS.find((a) => a.id === areaId) || OPCIONES_AREAS[3];
-
-    // Aseguramos dinámicamente que la fila exista en el tablero visual
-    setFilasCronograma((prev) => {
-      if (!prev.some((fila) => Number(fila.id) === Number(areaAsociada.id))) {
-        return [...prev, areaAsociada];
-      }
-      return prev;
-    });
-
-    const resultadoConArea = {
-      ...resultado,
-      areaId: Number(areaId),
-      semanasNecesarias: 4,
+    const cargarResultados = async () => {
+        try {
+            const data = await getLearningResults();
+            const datosMapeados: ResultadoAprendizaje[] = (data || []).map((item: { id: number; result?: string; descripcion?: string }) => ({
+                id: item.id,
+                descripcion: item.descripcion || item.result || "Sin descripción disponible",
+                areaId: 4,
+                semanasNecesarias: 4
+            }));
+            setResultadosDisponibles(datosMapeados);
+        } catch (error) {
+            console.error(error);
+            Alert.alert("Error", "No se pudieron cargar los resultados de aprendizaje.");
+        }
     };
 
-    setResultados((prev) => [...prev, resultadoConArea]);
-    setModalVisible(false);
-  };
+    const cambiarAreaDeFila = (indexFila: number, nuevaArea: AreaPractica) => {
+        const areaDuplicada = filasCronograma.some(
+            (fila, idx) => fila.id === nuevaArea.id && idx !== indexFila
+        );
 
-  const eliminarResultados = (ids: (number | string)[]) => {
-    setResultados((prev) => prev.filter((r) => !ids.includes(r.id)));
-  };
+        if (areaDuplicada) {
+            Alert.alert(
+                "Área Duplicada",
+                `El área "${nuevaArea.nombre}" ya está asignada a otra fila del cronograma.`
+            );
+            return;
+        }
 
-  const generarCalendario = async () => {
-    try {
-      const nuevasSemanas = await generarSemanas(fechaInicio);
-      setSemanas(nuevasSemanas);
-    } catch (error) {
-      console.log(error);
-      Alert.alert("Error", "No se pudo generar el cronograma.");
-    }
-  };
+        setFilasCronograma((prev) => {
+            const nuevasFilas = [...prev];
+            nuevasFilas[indexFila] = nuevaArea;
+            return nuevasFilas;
+        });
+    };
 
-  const esWeb = Platform.OS === "web";
+    const agregarResultado = (resultado: ResultadoAprendizaje) => {
+        if (resultados.some((r) => r.id === resultado.id)) {
+            Alert.alert("Aviso", "Este resultado ya fue agregado");
+            return;
+        }
 
-  const dynamicTablesDirection: StyleProp<ViewStyle> = [
-    styles.tablesContainer, 
-    { 
-      flexDirection: esWeb ? "row" : "column",
-      pointerEvents: "box-none" as any 
-    }
-  ];
+        const descNormalizada = (resultado.descripcion || "")
+            .toLowerCase()
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "");
 
-  const filtrarResultadosFaltantes = () => {
-    return resultadosDisponibles.filter(
-      (disponible) => !resultados.some((agregado) => agregado.id === disponible.id)
+        let areaId = 4;
+
+        if (
+            descNormalizada.includes("diseno") ||
+            descNormalizada.includes("ui") ||
+            descNormalizada.includes("ux") ||
+            descNormalizada.includes("interfaz")
+        ) {
+            areaId = 1;
+        } else if (
+            descNormalizada.includes("investiga") ||
+            descNormalizada.includes("diagnostico")
+        ) {
+            areaId = 2;
+        } else if (
+            descNormalizada.includes("agil") ||
+            descNormalizada.includes("innov") ||
+            descNormalizada.includes("arquitectura") ||
+            descNormalizada.includes("empresarial")
+        ) {
+            areaId = 5;
+        } else if (
+            descNormalizada.includes("movil") ||
+            descNormalizada.includes("nat") ||
+            descNormalizada.includes("api") ||
+            descNormalizada.includes("rest") ||
+            descNormalizada.includes("base de datos") ||
+            descNormalizada.includes("typeorm") ||
+            descNormalizada.includes("postgres") ||
+            descNormalizada.includes("nestjs") ||
+            descNormalizada.includes("defensa") ||
+            descNormalizada.includes("jwt") ||
+            descNormalizada.includes("autenticacion") ||
+            descNormalizada.includes("programacion")
+        ) {
+            areaId = 3;
+        }
+
+        const areaAsociada = OPCIONES_AREAS.find((a) => a.id === areaId) || OPCIONES_AREAS[3];
+
+        setFilasCronograma((prev) => {
+            if (!prev.some((fila) => fila.id === areaAsociada.id)) {
+                return [...prev, areaAsociada];
+            }
+            return prev;
+        });
+
+        const resultadoConArea: ResultadoAprendizaje = {
+            ...resultado,
+            areaId: areaId,
+            semanasNecesarias: 4,
+        };
+
+        setResultados((prev) => [...prev, resultadoConArea]);
+        setModalVisible(false);
+    };
+
+    const eliminarResultados = (ids: (number | string)[]) => {
+        setResultados((prev) => prev.filter((r) => !ids.includes(r.id)));
+    };
+
+    const generarCalendario = async () => {
+        try {
+            const nuevasSemanas = await generarSemanas(fechaInicio);
+            setSemanas(nuevasSemanas);
+        } catch (error) {
+            console.error(error);
+            Alert.alert("Error", "No se pudo generar el cronograma.");
+        }
+    };
+
+    const imprimirPlanPDF = async (datosPlan: any) => {
+        const htmlContent = `
+          <html>
+            <head>
+              <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no" />
+              <style>
+                body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; padding: 30px; color: #333; }
+                h1 { text-align: center; color: #1E3A8A; margin-bottom: 20px; text-transform: uppercase; letter-spacing: 1px; }
+                .info-box { border: 1px solid #E5E7EB; padding: 15px; border-radius: 8px; margin-bottom: 20px; background-color: #F9FAFB; }
+                .label { font-weight: bold; color: #4B5563; }
+                .content { margin-bottom: 10px; font-size: 14px; }
+                h3 { color: #1E3A8A; border-bottom: 2px solid #E5E7EB; padding-bottom: 5px; margin-top: 25px; }
+                p { font-size: 14px; line-height: 1.6; white-space: pre-wrap; color: #4B5563; }
+              </style>
+            </head>
+            <body>
+              <h1>Plan de Rotación de Prácticas</h1>
+              
+              <div class="info-box">
+                <div class="content"><span class="label">ID de Pasantía:</span> ${datosPlan.internship_id}</div>
+                <div class="content"><span class="label">Departamento / Área:</span> ${datosPlan.department}</div>
+                <div class="content"><span class="label">Fecha de Inicio:</span> ${datosPlan.start_date}</div>
+                <div class="content"><span class="label">Fecha de Fin:</span> ${datosPlan.end_date}</div>
+              </div>
+
+              <h3>Actividades a realizar:</h3>
+              <p>${datosPlan.activities}</p>
+            </body>
+          </html>
+        `;
+
+        try {
+            await Print.printAsync({ html: htmlContent });
+        } catch (error) {
+            console.error("Error al abrir la interfaz de impresión:", error);
+        }
+    };
+
+    // Lógica para ejecutar la inserción en la base de datos
+    const procederAGuardar = async () => {
+        setGuardando(true);
+
+        try {
+            const departamentosElegidos = filasCronograma.map(f => f.nombre).join(", ");
+
+            const actividadesTexto = resultados.map(r => 
+                `- [Área ${r.areaId}]: ${r.descripcion} (${r.semanasNecesarias} semanas)`
+            ).join("\n");
+
+            const formatearFecha = (date: Date) => date.toISOString().split('T')[0];
+            
+            const fechaFinCalculada = semanas.length > 0 
+                ? new Date(semanas[semanas.length - 1].fechaFin)
+                : new Date();
+
+            const payload = {
+                internship_id: 1,
+                department: departamentosElegidos || "General",
+                activities: actividadesTexto,
+                start_date: formatearFecha(fechaInicio),
+                end_date: formatearFecha(fechaFinCalculada)
+            };
+
+            const resultado = await createRotationPlan(payload);
+            console.log("Respuesta Exitosa de Supabase:", resultado);
+
+            // Alerta simulando un Toast / Confirmación exitosa en pantalla
+            Alert.alert("Éxito", "¡Plan de rotación guardado correctamente!");
+
+            // Si Supabase devuelve el registro dentro de un arreglo, generamos el PDF automáticamente
+            if (resultado && resultado[0]) {
+                await imprimirPlanPDF(resultado[0]);
+            } else if (resultado && !Array.isArray(resultado)) {
+                // En caso de que el objeto devuelto no sea un arreglo sino la fila directa
+                await imprimirPlanPDF(resultado);
+            }
+
+        } catch (error: any) {
+            console.error("🔴 Error completo al guardar en Supabase:");
+            if (error.response) {
+                console.error("Detalle de Supabase:", error.response.data);
+                Alert.alert("Error de Servidor", `Supabase dice: ${error.response.data.message || "Error de autenticación/permisos"}`);
+            } else {
+                console.error(error);
+                Alert.alert("Error", "Ocurrió un error al guardar el plan.");
+            }
+        } finally {
+            setGuardando(false);
+        }
+    };
+
+    // Función principal de guardado con cuadro de confirmación previo
+    const handleGuardar = () => {
+        if (resultados.length === 0) {
+            Alert.alert("Validación", "Debes agregar al menos un resultado de aprendizaje.");
+            return;
+        }
+        if (semanas.length === 0) {
+            Alert.alert("Validación", "Por favor, genera el cronograma antes de guardar.");
+            return;
+        }
+
+        if (Platform.OS === "web") {
+            // Confirmación específica en Web (Corregido con paréntesis)
+            const confirmarWeb = window.confirm("¿Estás seguro de que deseas guardar este Plan de Rotación?");
+            if (confirmarWeb) {
+                procederAGuardar();
+            }
+        } else {
+            // Confirmación nativa en Móviles (Android / iOS)
+            Alert.alert(
+                "Confirmación",
+                "¿Estás seguro de que deseas guardar este Plan de Rotación?",
+                [
+                    { text: "Cancelar", style: "cancel" },
+                    { text: "Guardar", onPress: procederAGuardar }
+                ]
+            );
+        }
+    };
+
+    const esWeb = Platform.OS === "web";
+
+    const dynamicTablesDirection: StyleProp<ViewStyle> = [
+        styles.tablesContainer,
+        {
+            flexDirection: esWeb ? "row" : "column",
+        }
+    ];
+
+    const filtrarResultadosFaltantes = (): ResultadoAprendizaje[] => {
+        return resultadosDisponibles.filter(
+            (disponible) => !resultados.some((agregado) => agregado.id === disponible.id)
+        );
+    };
+
+    return (
+        <ScrollView
+            style={[styles.scrollContainer, esWeb ? { height: "100vh" as ViewStyle["height"] } : null]}
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={true}
+        >
+            <View style={styles.paddingView}>
+                <PlanificacionHeader
+                    fechaInicio={fechaInicio}
+                    setFechaInicio={setFechaInicio}
+                    onGenerar={generarCalendario}
+                />
+
+                <View style={dynamicTablesDirection}>
+                    <View style={(esWeb ? styles.colCronogramaWeb : styles.colFullMovil) as StyleProp<ViewStyle>}>
+                        <View style={styles.cardWrapper}>
+                            <TablaCronograma
+                                areas={filasCronograma}
+                                opcionesDisponibles={OPCIONES_AREAS}
+                                semanas={semanas}
+                                resultados={resultados}
+                                onCambiarArea={cambiarAreaDeFila}
+                            />
+                        </View>
+                    </View>
+
+                    <View style={(esWeb ? styles.colResultadosWeb : styles.colFullMovil) as StyleProp<ViewStyle>}>
+                        <View style={[styles.cardWrapper, styles.overflowHidden]}>
+                            <ResultadoTable
+                                resultados={resultados}
+                                onAgregar={() => setModalVisible(true)}
+                                onEliminar={eliminarResultados}
+                            />
+                        </View>
+                    </View>
+                </View>
+            </View>
+
+            <ModalResultado
+                visible={modalVisible}
+                resultados={filtrarResultadosFaltantes()}
+                onClose={() => setModalVisible(false)}
+                onSelect={agregarResultado}
+            />
+
+            <View style={styles.actionButtonContainer}>
+                <TouchableOpacity 
+                    style={[styles.submitButton, { backgroundColor: guardando ? "#60a5fa" : "#2563eb" }]}
+                    onPress={handleGuardar}
+                    disabled={guardando}
+                >
+                    {guardando ? (
+                        <ActivityIndicator color="#fff" />
+                    ) : (
+                        <Text style={styles.submitButtonText}>Guardar Plan</Text>
+                    )}
+                </TouchableOpacity>
+            </View>
+        </ScrollView>
     );
-  };
-
-  return (
-    <ScrollView
-      style={[styles.scrollContainer, esWeb ? { height: "100vh" as any } : null]}
-      contentContainerStyle={styles.scrollContent}
-      showsVerticalScrollIndicator={true}
-    >
-      <View className="px-4 w-full">
-        <PlanificacionHeader
-          fechaInicio={fechaInicio}
-          setFechaInicio={setFechaInicio}
-          onGenerar={generarCalendario}
-        />
-
-        <View style={dynamicTablesDirection}>
-          <View style={(esWeb ? styles.colCronogramaWeb : styles.colFullMovil) as StyleProp<ViewStyle>}>
-            <View className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-              <TablaCronograma
-                areas={filasCronograma}
-                opcionesDisponibles={OPCIONES_AREAS}
-                semanas={semanas}
-                resultados={resultados}
-                onCambiarArea={cambiarAreaDeFila}
-              />
-            </View>
-          </View>
-
-          <View style={(esWeb ? styles.colResultadosWeb : styles.colFullMovil) as StyleProp<ViewStyle>}>
-            <View className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-              <ResultadoTable
-                resultados={resultados}
-                onAgregar={() => setModalVisible(true)}
-                onEliminar={eliminarResultados}
-              />
-            </View>
-          </View>
-        </View>
-      </View>
-
-      <ModalResultado
-        visible={modalVisible}
-        resultados={filtrarResultadosFaltantes()}
-        onClose={() => setModalVisible(false)}
-        onSelect={agregarResultado}
-      />
-    </ScrollView>
-  );
 }
 
 const styles = StyleSheet.create({
-  scrollContainer: { backgroundColor: "#f9fafb" },
-  scrollContent: { paddingBottom: 120, flexGrow: 1 },
-  tablesContainer: { width: "100%", marginTop: 16, alignItems: "flex-start" },
-  colCronogramaWeb: { flex: 6, marginRight: 16 },
-  colResultadosWeb: { flex: 4 },
-  colFullMovil: { width: "100%", marginBottom: 16 },
+    scrollContainer: { backgroundColor: "#f9fafb" },
+    scrollContent: { paddingBottom: 120, flexGrow: 1 },
+    paddingView: { paddingHorizontal: 16, width: "100%" },
+    tablesContainer: { width: "100%", marginTop: 16, alignItems: "flex-start" },
+    colCronogramaWeb: { flex: 6, marginRight: 16 },
+    colResultadosWeb: { flex: 4 },
+    colFullMovil: { width: "100%", marginBottom: 16 },
+    cardWrapper: { backgroundColor: "#ffffff", borderRadius: 12, shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 2, borderWidth: 1, borderColor: "#f3f4f6" },
+    overflowHidden: { overflow: "hidden" },
+    actionButtonContainer: { marginTop: 20, marginBottom: 20, paddingHorizontal: 16 },
+    submitButton: { paddingVertical: 12, borderRadius: 12, alignItems: "center" },
+    submitButtonText: { color: "#ffffff", fontWeight: "600", fontSize: 16 }
 });

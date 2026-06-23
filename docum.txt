@@ -1,0 +1,1059 @@
+import { TouchableOpacity, Text } from "react-native";
+
+interface Props {
+  title: string;
+  onPress: () => void;
+}
+
+export default function AppButton({
+  title,
+  onPress,
+}: Props) {
+  return (
+    <TouchableOpacity
+      className="bg-blue-600 p-4 rounded-lg"
+      onPress={onPress}
+    >
+      <Text className="text-white text-center font-bold">
+        {title}
+      </Text>
+    </TouchableOpacity>
+  );
+} 
+
+import { TextInput } from "react-native";
+
+interface Props {
+  value: string;
+  onChangeText: (text: string) => void;
+  placeholder?: string;
+}
+
+export default function AppInput({
+  value,
+  onChangeText,
+  placeholder,
+}: Props) {
+  return (
+    <TextInput
+      className="border border-gray-300 rounded-lg p-3"
+      value={value}
+      placeholder={placeholder}
+      onChangeText={onChangeText}
+    />
+  );
+}
+
+import { Text, Pressable } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+
+interface Props {
+  semana: { numero: number };
+  area: { id: number | string; nombre: string };
+  resultados?: Array<{
+    areaId?: number | string;
+    semanasNecesarias?: number;
+  }>;
+}
+
+export default function CeldaCronograma({
+  semana,
+  area,
+  resultados = [],
+}: Props) {
+  // 1. Contamos el total de observaciones/objetivos agregados globalmente en toda la aplicación
+  const totalObservacionesGlobal = resultados.length;
+
+  // 2. Cada observación seleccionada activa exactamente 4 casillas en total
+  const casillasTotalesAPintar = totalObservacionesGlobal * 4;
+
+  // 3. Mapeamos de forma estricta el orden de tus filas (de arriba hacia abajo)
+  // tics = fila 1, desarrollo = fila 2, innovacion = fila 3
+  const ordenFilas: Record<string, number> = {
+    "4": 0, // Tics (Fila 1)
+    "3": 1, // Desarrollo (Fila 2)
+    "5": 2, // Innovación (Fila 3)
+  };
+
+  const idAreaStr = String(area.id).trim();
+  const indiceFila = ordenFilas[idAreaStr] !== undefined ? ordenFilas[idAreaStr] : 0;
+
+  const numSemana = Number(semana.numero); // Columnas de 1 a 8
+
+  // 4. Calculamos la posición lineal global de ESTA celda específica en el tablero
+  // Fila 0 (Tics): Semanas 1 a 8 -> Posiciones 1 a 8
+  // Fila 1 (Desarrollo): Semanas 1 a 8 -> Posiciones 9 a 16
+  // Fila 2 (Innovación): Semanas 1 a 8 -> Posiciones 17 a 24
+  const posicionGlobalCelda = (indiceFila * 8) + numSemana;
+
+  // 📋 LÓGICA SECUENCIAL GLOBAL:
+  // La celda se activa si su posición en el tablero es menor o igual al cupo acumulado por las observaciones
+  const estaActivo = posicionGlobalCelda <= casillasTotalesAPintar;
+
+  return (
+    <Pressable
+      className={`w-20 border-r border-gray-200 py-6 items-center justify-center active:bg-gray-100
+        ${estaActivo ? "bg-emerald-50" : "bg-white"}`}
+    >
+      {estaActivo ? (
+        <Ionicons name="checkmark-circle" size={32} color="#10b981" />
+      ) : (
+        <Text className="text-3xl text-gray-200">–</Text>
+      )}
+    </Pressable>
+  );
+} 
+
+
+import { useState } from "react";
+import { View, Text, Pressable, Modal, FlatList } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import CeldaCronograma from "./CeldaCronograma";
+import { AreaPractica } from "../../../types/area";
+
+interface Props {
+  area: AreaPractica;
+  indexFila: number;
+  opcionesDisponibles: AreaPractica[];
+  semanas: any[];
+  resultados?: any[];
+  onCambiarArea: (index: number, nuevaArea: AreaPractica) => void;
+}
+
+export default function FilaCronograma({
+  area,
+  indexFila,
+  opcionesDisponibles,
+  semanas,
+  resultados = [],
+  onCambiarArea,
+}: Props) {
+  const [selectorVisible, setSelectorVisible] = useState(false);
+
+  return (
+    <View className="flex-row border-b border-gray-200">
+      {/* Selector interactivo de Área/Puesto */}
+      <Pressable
+        onPress={() => setSelectorVisible(true)}
+        className="w-40 bg-blue-50/40 border-r border-gray-300 px-3 py-5 flex-row items-center justify-between active:bg-blue-100/60"
+      >
+        <Text className="font-semibold text-blue-900 text-base flex-1 pr-1" numberOfLines={1}>
+          {area.nombre}
+        </Text>
+        <Ionicons name="chevron-down" size={16} color="#1e40af" />
+      </Pressable>
+
+      {/* Celdas de semanas */}
+      {semanas.map((semana, index) => (
+        <CeldaCronograma
+          key={semana.numero || index}
+          semana={semana}
+          area={area}
+          resultados={resultados}
+        />
+      ))}
+
+      {/* Modal / Selector Dropdown Flotante */}
+      <Modal visible={selectorVisible} transparent animationType="fade">
+        <Pressable 
+          className="flex-1 justify-center items-center bg-black/40" 
+          onPress={() => setSelectorVisible(false)}
+        >
+          <View className="bg-white w-40 rounded-2xl shadow-xl max-h-80 overflow-hidden">
+            <View className="bg-gray-50 px-4 py-3 border-b border-gray-100">
+              <Text className="font-bold text-gray-700 text-center">Cambiar Puesto/Área</Text>
+            </View>
+            <FlatList
+              data={opcionesDisponibles}
+              keyExtractor={(item) => String(item.id)}
+              renderItem={({ item }) => (
+                <Pressable
+                  className={`px-5 py-4 border-b border-gray-100 flex-row items-center justify-between active:bg-gray-50 ${
+                    item.id === area.id ? "bg-blue-50/50" : ""
+                  }`}
+                  onPress={() => {
+                    onCambiarArea(indexFila, item);
+                    setSelectorVisible(false);
+                  }}
+                >
+                  <Text className={`text-base ${item.id === area.id ? "text-blue-600 font-bold" : "text-gray-800"}`}>
+                    {item.nombre}
+                  </Text>
+                  {item.id === area.id && <Ionicons name="checkmark" size={18} color="#2563eb" />}
+                </Pressable>
+              )}
+            />
+          </View>
+        </Pressable>
+      </Modal>
+    </View>
+  );
+} 
+
+import React from "react";
+import {
+  Modal,
+  View,
+  Text,
+  FlatList,
+  Pressable,
+  ScrollView,
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+
+interface Props {
+  visible: boolean;
+  resultados: Array<{ id: number | string; descripcion: string }>;
+  onClose: () => void;
+  onSelect: (item: any) => void;
+}
+
+export default function ModalResultado({
+  visible,
+  resultados,
+  onClose,
+  onSelect,
+}: Props) {
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      statusBarTranslucent
+    >
+      <View className="flex-1 justify-center items-center bg-black/70">
+        <View className="bg-white w-11/12 max-w-lg rounded-2xl shadow-xl overflow-hidden">
+          {/* Header del Modal */}
+          <View className="px-6 py-5 border-b border-gray-100">
+            <Text className="text-2xl font-bold text-gray-900">
+              Resultados de Aprendizaje
+            </Text>
+            <Text className="text-gray-500 mt-1">
+              Selecciona uno para agregar
+            </Text>
+          </View>
+
+          {/* Lista */}
+          <FlatList
+            data={resultados}
+            keyExtractor={(item) => item.id.toString()}
+            renderItem={({ item }) => (
+              <Pressable
+                className="px-6 py-4 border-b border-gray-100 active:bg-gray-50"
+                onPress={() => onSelect(item)}
+              >
+                <View className="flex-row items-start">
+                  <Ionicons
+                    name="checkmark-circle-outline"
+                    size={24}
+                    color="#10b981"
+                    style={{ marginRight: 12, marginTop: 2 }}
+                  />
+                  <Text className="flex-1 text-gray-800 leading-snug">
+                    {item.descripcion}
+                  </Text>
+                </View>
+              </Pressable>
+            )}
+            ListEmptyComponent={
+              <View className="py-12 items-center">
+                <Text className="text-gray-400">No hay resultados disponibles</Text>
+              </View>
+            }
+          />
+
+          {/* Botón Cerrar */}
+          <View className="p-4 border-t border-gray-100">
+            <Pressable
+              className="bg-gray-200 py-3.5 rounded-xl active:bg-gray-300"
+              onPress={onClose}
+            >
+              <Text className="text-gray-700 font-semibold text-center text-base">
+                Cerrar
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+} 
+
+import { useState } from "react";
+import {
+  View,
+  Text,
+  Pressable,
+  Platform,
+} from "react-native";
+import DateTimePicker from "@react-native-community/datetimepicker";
+import { Ionicons } from "@expo/vector-icons";
+
+interface Props {
+  fechaInicio: Date;
+  setFechaInicio: (fecha: Date) => void;
+  onGenerar: () => void;
+}
+
+export default function PlanificacionHeader({
+  fechaInicio,
+  setFechaInicio,
+  onGenerar,
+}: Props) {
+  const [showPicker, setShowPicker] = useState(false);
+
+  const formattedDate = fechaInicio.toLocaleDateString("es-ES", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+
+  return (
+    <View className="bg-white mx-4 mt-4 rounded-2xl shadow-lg p-6 border border-gray-100">
+      <Text className="text-3xl font-bold text-gray-900">
+        Planificación de Prácticas
+      </Text>
+
+      <Text className="mt-6 mb-2 text-lg font-semibold text-gray-700">
+        Fecha de Inicio
+      </Text>
+
+      <View className="flex-row items-center gap-3">
+        <Pressable
+          className="flex-1 bg-gray-50 border border-gray-200 rounded-xl p-4 active:bg-gray-100"
+          onPress={() => setShowPicker(true)}
+        >
+          <View className="flex-row items-center">
+            <Ionicons name="calendar-outline" size={24} color="#4B5563" />
+            <Text className="ml-3 text-base text-gray-800 font-medium">
+              {formattedDate}
+            </Text>
+          </View>
+        </Pressable>
+
+        <Pressable
+          className="bg-blue-600 px-8 py-4 rounded-xl active:bg-blue-700"
+          onPress={onGenerar}
+        >
+          <Text className="text-white font-semibold text-base">Generar</Text>
+        </Pressable>
+      </View>
+
+      {showPicker && (
+        <DateTimePicker
+          value={fechaInicio}
+          mode="date"
+          display={Platform.OS === "ios" ? "spinner" : "default"}
+          onChange={(event, selectedDate) => {
+            setShowPicker(false);
+            if (selectedDate) {
+              setFechaInicio(selectedDate);
+            }
+          }}
+        />
+      )}
+    </View>
+  );
+}
+
+   import React, { useState } from "react";
+import { View, Text, Pressable, FlatList, Alert } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+
+interface Resultado {
+  id: number | string;
+  descripcion: string;
+}
+
+interface Props {
+  resultados: Resultado[];
+  onAgregar: () => void;
+  onEliminar: (ids: (number | string)[]) => void;
+}
+
+export default function ResultadoTable({
+  resultados,
+  onAgregar,
+  onEliminar,
+}: Props) {
+  const [selectedIds, setSelectedIds] = useState<(number | string)[]>([]);
+
+  const toggleSelect = (id: number | string) => {
+    setSelectedIds((prev) =>
+      prev.includes(id)
+        ? prev.filter((itemId) => itemId !== id)
+        : [...prev, id]
+    );
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.length === resultados.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(resultados.map((item) => item.id));
+    }
+  };
+
+  const handleDelete = () => {
+    if (selectedIds.length === 0) return;
+
+    const confirmar = window.confirm(
+      `¿Estás seguro de eliminar ${selectedIds.length} resultado(s) de aprendizaje?`
+    );
+
+    if (confirmar) {
+      onEliminar(selectedIds);
+      setSelectedIds([]);
+    }
+  };
+
+  return (
+    <View className="bg-white mx-4 mt-6 rounded-2xl shadow-lg overflow-hidden border border-gray-100">
+      {/* Header Corregido: Permite que los elementos se envuelvan fluidamente si falta espacio */}
+      <View className="px-5 py-4 border-b border-gray-100 bg-gray-50 flex-row flex-wrap justify-between items-center gap-y-3">
+        <View className="flex-1 min-w-[160px]">
+          <Text className="font-bold text-xl text-gray-900 leading-tight">
+            Resultados de Aprendizaje
+          </Text>
+          <Text className="text-gray-500 text-sm mt-0.5">
+            {resultados.length} agregados
+          </Text>
+        </View>
+
+        {/* Contenedor de Botones optimizado y alineado */}
+        <View className="flex-row items-center gap-2 flex-wrap justify-end">
+          {selectedIds.length > 0 && (
+            <Pressable
+              className="bg-red-600 px-3.5 py-2 rounded-xl flex-row items-center active:bg-red-700"
+              onPress={handleDelete}
+            >
+              <Ionicons name="trash-outline" size={18} color="white" />
+              <Text className="text-white font-semibold ml-1.5 text-sm">
+                Eliminar ({selectedIds.length})
+              </Text>
+            </Pressable>
+          )}
+
+          <Pressable
+            className="bg-emerald-600 px-3.5 py-2 rounded-xl flex-row items-center active:bg-emerald-700"
+            onPress={onAgregar}
+          >
+            <Ionicons name="add" size={18} color="white" />
+            <Text className="text-white font-semibold ml-1 text-sm">Agregar</Text>
+          </Pressable>
+        </View>
+      </View>
+
+      {/* Select All */}
+      {resultados.length > 0 && (
+        <Pressable
+          onPress={toggleSelectAll}
+          className="flex-row items-center px-5 py-3 bg-white border-b border-gray-100 active:bg-gray-50"
+        >
+          <View
+            className={`w-6 h-6 border-2 rounded-lg mr-3 items-center justify-center ${
+              selectedIds.length === resultados.length
+                ? "bg-blue-600 border-blue-600"
+                : "border-gray-300"
+            }`}
+          >
+            {selectedIds.length === resultados.length && (
+              <Ionicons name="checkmark" size={16} color="white" />
+            )}
+          </View>
+          <Text className="text-gray-700 font-medium">Seleccionar todos</Text>
+        </Pressable>
+      )}
+
+      {/* Lista */}
+      <FlatList
+        data={resultados}
+        keyExtractor={(item) => String(item.id)}
+        renderItem={({ item, index }) => {
+          const isSelected = selectedIds.includes(item.id);
+          return (
+            <Pressable
+              onPress={() => toggleSelect(item.id)}
+              className={`flex-row items-center px-5 py-4 border-b border-gray-100 active:bg-gray-50 ${
+                isSelected ? "bg-blue-50" : "bg-white"
+              }`}
+            >
+              {/* Checkbox */}
+              <View
+                className={`w-7 h-7 border-2 rounded-xl mr-4 items-center justify-center transition-all ${
+                  isSelected
+                    ? "bg-blue-600 border-blue-600"
+                    : "border-gray-300"
+                }`}
+              >
+                {isSelected && <Ionicons name="checkmark" size={18} color="white" />}
+              </View>
+
+              {/* Número */}
+              <View className="w-8">
+                <Text className="text-gray-400 font-medium text-lg">
+                  {index + 1}
+                </Text>
+              </View>
+
+              {/* Descripción */}
+              <Text className="flex-1 text-gray-800 leading-snug pr-4">
+                {item.descripcion}
+              </Text>
+            </Pressable>
+          );
+        }}
+        ListEmptyComponent={
+          <View className="py-16 items-center">
+            <Ionicons name="document-text-outline" size={48} color="#9CA3AF" />
+            <Text className="text-gray-400 mt-4 text-lg font-medium">
+              No hay resultados agregados
+            </Text>
+            <Text className="text-gray-400 text-center mt-1 px-10">
+              Presiona "Agregar" para incluir resultados de aprendizaje
+            </Text>
+          </View>
+        }
+      />
+    </View>
+  );
+}   
+
+import React, { useState } from "react";
+import { View, Text, Pressable, FlatList, Alert } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+
+interface Resultado {
+  id: number | string;
+  descripcion: string;
+}
+
+interface Props {
+  resultados: Resultado[];
+  onAgregar: () => void;
+  onEliminar: (ids: (number | string)[]) => void;
+}
+
+export default function ResultadoTable({
+  resultados,
+  onAgregar,
+  onEliminar,
+}: Props) {
+  const [selectedIds, setSelectedIds] = useState<(number | string)[]>([]);
+
+  const toggleSelect = (id: number | string) => {
+    setSelectedIds((prev) =>
+      prev.includes(id)
+        ? prev.filter((itemId) => itemId !== id)
+        : [...prev, id]
+    );
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.length === resultados.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(resultados.map((item) => item.id));
+    }
+  };
+
+  const handleDelete = () => {
+    if (selectedIds.length === 0) return;
+
+    const confirmar = window.confirm(
+      `¿Estás seguro de eliminar ${selectedIds.length} resultado(s) de aprendizaje?`
+    );
+
+    if (confirmar) {
+      onEliminar(selectedIds);
+      setSelectedIds([]);
+    }
+  };
+
+  return (
+    <View className="bg-white mx-4 mt-6 rounded-2xl shadow-lg overflow-hidden border border-gray-100">
+      {/* Header Corregido: Permite que los elementos se envuelvan fluidamente si falta espacio */}
+      <View className="px-5 py-4 border-b border-gray-100 bg-gray-50 flex-row flex-wrap justify-between items-center gap-y-3">
+        <View className="flex-1 min-w-[160px]">
+          <Text className="font-bold text-xl text-gray-900 leading-tight">
+            Resultados de Aprendizaje
+          </Text>
+          <Text className="text-gray-500 text-sm mt-0.5">
+            {resultados.length} agregados
+          </Text>
+        </View>
+
+        {/* Contenedor de Botones optimizado y alineado */}
+        <View className="flex-row items-center gap-2 flex-wrap justify-end">
+          {selectedIds.length > 0 && (
+            <Pressable
+              className="bg-red-600 px-3.5 py-2 rounded-xl flex-row items-center active:bg-red-700"
+              onPress={handleDelete}
+            >
+              <Ionicons name="trash-outline" size={18} color="white" />
+              <Text className="text-white font-semibold ml-1.5 text-sm">
+                Eliminar ({selectedIds.length})
+              </Text>
+            </Pressable>
+          )}
+
+          <Pressable
+            className="bg-emerald-600 px-3.5 py-2 rounded-xl flex-row items-center active:bg-emerald-700"
+            onPress={onAgregar}
+          >
+            <Ionicons name="add" size={18} color="white" />
+            <Text className="text-white font-semibold ml-1 text-sm">Agregar</Text>
+          </Pressable>
+        </View>
+      </View>
+
+      {/* Select All */}
+      {resultados.length > 0 && (
+        <Pressable
+          onPress={toggleSelectAll}
+          className="flex-row items-center px-5 py-3 bg-white border-b border-gray-100 active:bg-gray-50"
+        >
+          <View
+            className={`w-6 h-6 border-2 rounded-lg mr-3 items-center justify-center ${
+              selectedIds.length === resultados.length
+                ? "bg-blue-600 border-blue-600"
+                : "border-gray-300"
+            }`}
+          >
+            {selectedIds.length === resultados.length && (
+              <Ionicons name="checkmark" size={16} color="white" />
+            )}
+          </View>
+          <Text className="text-gray-700 font-medium">Seleccionar todos</Text>
+        </Pressable>
+      )}
+
+      {/* Lista */}
+      <FlatList
+        data={resultados}
+        keyExtractor={(item) => String(item.id)}
+        renderItem={({ item, index }) => {
+          const isSelected = selectedIds.includes(item.id);
+          return (
+            <Pressable
+              onPress={() => toggleSelect(item.id)}
+              className={`flex-row items-center px-5 py-4 border-b border-gray-100 active:bg-gray-50 ${
+                isSelected ? "bg-blue-50" : "bg-white"
+              }`}
+            >
+              {/* Checkbox */}
+              <View
+                className={`w-7 h-7 border-2 rounded-xl mr-4 items-center justify-center transition-all ${
+                  isSelected
+                    ? "bg-blue-600 border-blue-600"
+                    : "border-gray-300"
+                }`}
+              >
+                {isSelected && <Ionicons name="checkmark" size={18} color="white" />}
+              </View>
+
+              {/* Número */}
+              <View className="w-8">
+                <Text className="text-gray-400 font-medium text-lg">
+                  {index + 1}
+                </Text>
+              </View>
+
+              {/* Descripción */}
+              <Text className="flex-1 text-gray-800 leading-snug pr-4">
+                {item.descripcion}
+              </Text>
+            </Pressable>
+          );
+        }}
+        ListEmptyComponent={
+          <View className="py-16 items-center">
+            <Ionicons name="document-text-outline" size={48} color="#9CA3AF" />
+            <Text className="text-gray-400 mt-4 text-lg font-medium">
+              No hay resultados agregados
+            </Text>
+            <Text className="text-gray-400 text-center mt-1 px-10">
+              Presiona "Agregar" para incluir resultados de aprendizaje
+            </Text>
+          </View>
+        }
+      />
+    </View>
+  );
+}
+
+import axios from "axios";
+
+// ==========================================
+// CONFIGURACIÓN DE INSTANCIAS (AXIOS)
+// ==========================================
+
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ0bGpvYWxhZHB5dGZudXFyeXVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwNDEyOTgsImV4cCI6MjA5NjYxNzI5OH0.Li0hnWB1qU3u_5G6Yy6VOv2nHJnrMJ6bqrcjeEYUJG0";
+
+export const apiLocal = axios.create({
+  baseURL: "http://192.168.3.19:3000",
+  timeout: 10000,
+  headers: {
+    "Content-Type": "application/json",
+  },
+});
+
+export const apiSupabase = axios.create({
+  baseURL: "https://ftljoaladpytfnuqryuq.supabase.co/rest/v1",
+  timeout: 10000,
+  headers: {
+    "Content-Type": "application/json",
+    "apikey": SUPABASE_ANON_KEY,
+    "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+  },
+});
+
+// ==========================================
+// EXPECTED ACHIEVEMENTS
+// ==========================================
+export const getExpectedAchievements = async () => {
+  const { data } = await apiSupabase.get("/expected_achievements");
+  return data;
+};
+
+export const getExpectedAchievementById = async (id: number) => {
+  const { data } = await apiSupabase.get(`/expected_achievements?id=eq.${id}`);
+  return data[0] || null;
+};
+
+export const createExpectedAchievement = async (body: any) => {
+  const { data } = await apiSupabase.post("/expected_achievements", body);
+  return data;
+};
+
+export const updateExpectedAchievement = async (id: number, body: any) => {
+  const { data } = await apiSupabase.put(`/expected_achievements?id=eq.${id}`, body);
+  return data;
+};
+
+export const deleteExpectedAchievement = async (id: number) => {
+  const { data } = await apiSupabase.delete(`/expected_achievements?id=eq.${id}`);
+  return data;
+};
+
+// ==========================================
+// USERS
+// ==========================================
+export const getUsers = async () => {
+  const { data } = await apiSupabase.get("/users");
+  return data;
+};
+
+export const getUserById = async (id: number) => {
+  const { data } = await apiSupabase.get(`/users?id=eq.${id}`);
+  return data[0] || null;
+};
+
+export const createUser = async (body: any) => {
+  const { data } = await apiSupabase.post("/users", body);
+  return data;
+};
+
+export const updateUser = async (id: number, body: any) => {
+  const { data } = await apiSupabase.put(`/users?id=eq.${id}`, body);
+  return data;
+};
+
+export const deleteUser = async (id: number) => {
+  const { data } = await apiSupabase.delete(`/users?id=eq.${id}`);
+  return data;
+};
+
+// ==========================================
+// CAREERS
+// ==========================================
+export const getCareers = async () => {
+  const { data } = await apiSupabase.get("/careers");
+  return data;
+};
+
+export const getCareerById = async (id: number) => {
+  const { data } = await apiSupabase.get(`/careers?id=eq.${id}`);
+  return data[0] || null;
+};
+
+export const createCareer = async (body: any) => {
+  const { data } = await apiSupabase.post("/careers", body);
+  return data;
+};
+
+export const updateCareer = async (id: number, body: any) => {
+  const { data } = await apiSupabase.put(`/careers?id=eq.${id}`, body);
+  return data;
+};
+
+export const deleteCareer = async (id: number) => {
+  const { data } = await apiSupabase.delete(`/careers?id=eq.${id}`);
+  return data;
+};
+
+// ==========================================
+// COMPANIES
+// ==========================================
+export const getCompanies = async () => {
+  const { data } = await apiSupabase.get("/companies");
+  return data;
+};
+
+export const getCompanyById = async (id: number) => {
+  const { data } = await apiSupabase.get(`/companies?id=eq.${id}`);
+  return data[0] || null;
+};
+
+export const createCompany = async (body: any) => {
+  const { data } = await apiSupabase.post("/companies", body);
+  return data;
+};
+
+export const updateCompany = async (id: number, body: any) => {
+  const { data } = await apiSupabase.put(`/companies?id=eq.${id}`, body);
+  return data;
+};
+
+export const deleteCompany = async (id: number) => {
+  const { data } = await apiSupabase.delete(`/companies?id=eq.${id}`);
+  return data;
+};
+
+// ==========================================
+// LEARNING RESULTS
+// ==========================================
+export const getLearningResults = async () => {
+  const { data } = await apiSupabase.get("/learning_results");
+  return data;
+};
+
+export const getLearningResultById = async (id: number) => {
+  const { data } = await apiSupabase.get(`/learning_results?id=eq.${id}`);
+  return data[0] || null;
+};
+
+export const createLearningResult = async (body: any) => {
+  const { data } = await apiSupabase.post("/learning_results", body);
+  return data;
+};
+
+export const updateLearningResult = async (id: number, body: any) => {
+  const { data } = await apiSupabase.put(`/learning_results?id=eq.${id}`, body);
+  return data;
+};
+
+export const deleteLearningResult = async (id: number) => {
+  const { data } = await apiSupabase.delete(`/learning_results?id=eq.${id}`);
+  return data;
+};
+
+// ==========================================
+// WEEKS
+// ==========================================
+export const getWeeks = async () => {
+  const { data } = await apiSupabase.get("/weeks");
+  return data;
+};
+
+export const getWeekById = async (id: number) => {
+  const { data } = await apiSupabase.get(`/weeks?id=eq.${id}`);
+  return data[0] || null;
+};
+
+export const createWeek = async (body: any) => {
+  const { data } = await apiSupabase.post("/weeks", body);
+  return data;
+};
+
+export const updateWeek = async (id: number, body: any) => {
+  const { data } = await apiSupabase.put(`/weeks?id=eq.${id}`, body);
+  return data;
+};
+
+export const deleteWeek = async (id: number) => {
+  const { data } = await apiSupabase.delete(`/weeks?id=eq.${id}`);
+  return data;
+};
+
+// ==========================================
+// ROTATION PLANS
+// ==========================================
+export const getRotationPlans = async () => {
+  const { data } = await apiSupabase.get("/rotation_plans");
+  return data;
+};
+
+export const getRotationPlanById = async (id: number) => {
+  const { data } = await apiSupabase.get(`/rotation_plans?id=eq.${id}`);
+  return data[0] || null;
+};
+
+export const createRotationPlan = async (body: any) => {
+  const { data } = await apiSupabase.post("/rotation_plans", body);
+  return data;
+};
+
+export const updateRotationPlan = async (id: number, body: any) => {
+  const { data } = await apiSupabase.put(`/rotation_plans?id=eq.${id}`, body);
+  return data;
+};
+
+export const deleteRotationPlan = async (id: number) => {
+  const { data } = await apiSupabase.delete(`/rotation_plans?id=eq.${id}`);
+  return data;
+};
+
+// ==========================================
+// TRAINING PLANS
+// ==========================================
+export const getTrainingPlans = async () => {
+  const { data } = await apiSupabase.get("/training_plans");
+  return data;
+};
+
+export const getTrainingPlanById = async (id: number) => {
+  const { data } = await apiSupabase.get(`/training_plans?id=eq.${id}`);
+  return data[0] || null;
+};
+
+export const createTrainingPlan = async (body: any) => {
+  const { data } = await apiSupabase.post("/training_plans", body);
+  return data;
+};
+
+export const updateTrainingPlan = async (id: number, body: any) => {
+  const { data } = await apiSupabase.put(`/training_plans?id=eq.${id}`, body);
+  return data;
+};
+
+export const deleteTrainingPlan = async (id: number) => {
+  const { data } = await apiSupabase.delete(`/training_plans?id=eq.${id}`);
+  return data;
+};
+
+// ==========================================
+// LEARNING LOGS
+// ==========================================
+export const getLearningLogs = async () => {
+  const { data } = await apiSupabase.get("/learning_logs");
+  return data;
+};
+
+export const getLearningLogById = async (id: number) => {
+  const { data } = await apiSupabase.get(`/learning_logs?id=eq.${id}`);
+  return data[0] || null;
+};
+
+export const createLearningLog = async (body: any) => {
+  const { data } = await apiSupabase.post("/learning_logs", body);
+  return data;
+};
+
+export const updateLearningLog = async (id: number, body: any) => {
+  const { data } = await apiSupabase.put(`/learning_logs?id=eq.${id}`, body);
+  return data;
+};
+
+export const deleteLearningLog = async (id: number) => {
+  const { data } = await apiSupabase.delete(`/learning_logs?id=eq.${id}`);
+  return data;
+};  
+
+// src/utils/feriados.ts
+
+const API_URL = "https://date.nager.at/api/v3/PublicHolidays";
+
+export const obtenerFeriadosEcuador = async (year: number): Promise<Date[]> => {
+  try {
+    const response = await fetch(`${API_URL}/${year}/EC`);
+    if (!response.ok) {
+      console.warn(`No se pudieron obtener feriados para ${year}`);
+      return [];
+    }
+    const data = await response.json();
+    
+    return data.map((f: any) => new Date(f.date));
+  } catch (error) {
+    console.warn("Error al cargar feriados de Ecuador:", error);
+    return [];
+  }
+};
+
+// src/utils/generarSemanas.ts
+import { esFinSemana, esFeriado } from './validarFecha';
+import { obtenerFeriadosEcuador } from './feriados';
+
+export interface Semana {
+  numero: number;
+  fechaInicio: Date;
+  fechaFin: Date;
+  rango: string;
+  mes: string;
+}
+
+/**
+ * Genera 8 semanas laborales excluyendo fines de semana y feriados de Ecuador
+ */
+export const generarSemanas = async (fechaInicio: Date): Promise<Semana[]> => {
+  const semanas: Semana[] = [];
+  let fechaActual = new Date(fechaInicio);
+
+  const feriados = await obtenerFeriadosEcuador(fechaInicio.getFullYear());
+
+  // Ajustar al primer día hábil
+  while (esFinSemana(fechaActual) || esFeriado(fechaActual, feriados)) {
+    fechaActual.setDate(fechaActual.getDate() + 1);
+  }
+
+  for (let i = 1; i <= 8; i++) {
+    const diasLaborales: Date[] = [];
+    let fechaTemp = new Date(fechaActual);
+
+    // 🔥 SOLO 5 DÍAS LABORALES (L-V sin fines de semana ni feriados)
+    while (diasLaborales.length < 5) {
+      if (!esFinSemana(fechaTemp) && !esFeriado(fechaTemp, feriados)) {
+        diasLaborales.push(new Date(fechaTemp));
+      }
+
+      fechaTemp.setDate(fechaTemp.getDate() + 1);
+    }
+
+    const inicioSemana = diasLaborales[0];
+    const finSemana = diasLaborales[diasLaborales.length - 1];
+
+    semanas.push({
+      numero: i,
+      fechaInicio: inicioSemana,
+      fechaFin: finSemana,
+      rango: `${inicioSemana.getDate()}-${finSemana.getDate()}`,
+      mes: inicioSemana
+        .toLocaleString('es-ES', { month: 'short' })
+        .toUpperCase(),
+    });
+
+    // 🔥 mover al siguiente día hábil después de la semana
+    fechaActual = new Date(finSemana);
+    fechaActual.setDate(fechaActual.getDate() + 1);
+
+    while (esFinSemana(fechaActual) || esFeriado(fechaActual, feriados)) {
+      fechaActual.setDate(fechaActual.getDate() + 1);
+    }
+  }
+
+  return semanas;
+};// src/utils/validarFecha.ts
+
+export function esFinSemana(fecha: Date): boolean {
+  const dia = fecha.getDay();
+  return dia === 0 || dia === 6;
+}
+
+export function esFeriado(fecha: Date, feriados: Date[] = []): boolean {
+  return feriados.some((feriado) => 
+    feriado.getFullYear() === fecha.getFullYear() &&
+    feriado.getMonth() === fecha.getMonth() &&
+    feriado.getDate() === fecha.getDate()
+  );
+} 

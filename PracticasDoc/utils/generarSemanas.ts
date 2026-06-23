@@ -17,38 +17,40 @@ export const generarSemanas = async (fechaInicio: Date): Promise<Semana[]> => {
   const semanas: Semana[] = [];
   let fechaActual = new Date(fechaInicio);
 
-  // Obtener feriados del año actual
   const feriados = await obtenerFeriadosEcuador(fechaInicio.getFullYear());
 
-  // Ajustar al primer lunes hábil
+  // Ajustar al primer día hábil
   while (esFinSemana(fechaActual) || esFeriado(fechaActual, feriados)) {
     fechaActual.setDate(fechaActual.getDate() + 1);
   }
 
   for (let i = 1; i <= 8; i++) {
-    const inicioSemana = new Date(fechaActual);
-    let finSemana = new Date(fechaActual);
-    let diasLaborales = 0;
+    const diasLaborales: Date[] = [];
+    let fechaTemp = new Date(fechaActual);
 
-    // Completar 5 días laborables
-    while (diasLaborales < 5) {
-      if (!esFinSemana(finSemana) && !esFeriado(finSemana, feriados)) {
-        diasLaborales++;
+    // 🔥 SOLO 5 DÍAS LABORALES (L-V sin fines de semana ni feriados)
+    while (diasLaborales.length < 5) {
+      if (!esFinSemana(fechaTemp) && !esFeriado(fechaTemp, feriados)) {
+        diasLaborales.push(new Date(fechaTemp));
       }
-      if (diasLaborales < 5) {
-        finSemana.setDate(finSemana.getDate() + 1);
-      }
+
+      fechaTemp.setDate(fechaTemp.getDate() + 1);
     }
+
+    const inicioSemana = diasLaborales[0];
+    const finSemana = diasLaborales[diasLaborales.length - 1];
 
     semanas.push({
       numero: i,
       fechaInicio: inicioSemana,
       fechaFin: finSemana,
       rango: `${inicioSemana.getDate()}-${finSemana.getDate()}`,
-      mes: inicioSemana.toLocaleString('es-ES', { month: 'short' }).toUpperCase(),
+      mes: inicioSemana
+        .toLocaleString('es-ES', { month: 'short' })
+        .toUpperCase(),
     });
 
-    // Avanzar al siguiente lunes hábil
+    // 🔥 mover al siguiente día hábil después de la semana
     fechaActual = new Date(finSemana);
     fechaActual.setDate(fechaActual.getDate() + 1);
 

@@ -50,7 +50,7 @@ export default function CeldaCronograma({
         ${estaActivo ? "bg-emerald-50" : "bg-white"}`}
     >
       {estaActivo ? (
-        <Ionicons name="checkmark-circle" size={32} color="#10b981" />
+        <Ionicons name="checkmark-circle" size={30} color="#10b981" />
       ) : (
         <Text className="text-3xl text-gray-200">–</Text>
       )}
