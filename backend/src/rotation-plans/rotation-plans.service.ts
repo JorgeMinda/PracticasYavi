@@ -48,7 +48,7 @@ export class RotationPlanService {
         const startDate = semanas[0].fechaInicio;
         const endDate = semanas[semanas.length - 1].fechaFin;
 
-        // 🔧 SOLUCIÓN DEFINITIVA: Creamos un array plano acumulador para evitar los líos de inferencia del .map().filter()
+        
         const filas: Partial<RotationPlan>[] = [];
 
         for (const area of filasCronograma) {

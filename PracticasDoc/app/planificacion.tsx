@@ -2,8 +2,8 @@ import { useState, useEffect } from "react";
 import { ScrollView, Alert, View, Platform, StyleSheet, StyleProp, ViewStyle, TouchableOpacity, Text, ActivityIndicator } from "react-native";
 import { getLearningResults } from "../services/dataService";
 import { generarSemanas } from "../utils/generarSemanas";
-import * as Print from 'expo-print';
 
+import {imprimirPlanPDF} from "../utils/pdfStorage";
 import { createRotationPlan } from "../services/dataService";
 
 import PlanificacionHeader from "../components/common/planificacion/PlanificacionHeader";
@@ -159,43 +159,7 @@ export default function PlanificacionScreen() {
         }
     };
 
-    const imprimirPlanPDF = async (datosPlan: any) => {
-        const htmlContent = `
-          <html>
-            <head>
-              <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no" />
-              <style>
-                body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; padding: 30px; color: #333; }
-                h1 { text-align: center; color: #1E3A8A; margin-bottom: 20px; text-transform: uppercase; letter-spacing: 1px; }
-                .info-box { border: 1px solid #E5E7EB; padding: 15px; border-radius: 8px; margin-bottom: 20px; background-color: #F9FAFB; }
-                .label { font-weight: bold; color: #4B5563; }
-                .content { margin-bottom: 10px; font-size: 14px; }
-                h3 { color: #1E3A8A; border-bottom: 2px solid #E5E7EB; padding-bottom: 5px; margin-top: 25px; }
-                p { font-size: 14px; line-height: 1.6; white-space: pre-wrap; color: #4B5563; }
-              </style>
-            </head>
-            <body>
-              <h1>Plan de Rotación de Prácticas</h1>
-              
-              <div class="info-box">
-                <div class="content"><span class="label">ID de Pasantía:</span> ${datosPlan.internship_id}</div>
-                <div class="content"><span class="label">Departamento / Área:</span> ${datosPlan.department}</div>
-                <div class="content"><span class="label">Fecha de Inicio:</span> ${datosPlan.start_date}</div>
-                <div class="content"><span class="label">Fecha de Fin:</span> ${datosPlan.end_date}</div>
-              </div>
-
-              <h3>Actividades a realizar:</h3>
-              <p>${datosPlan.activities}</p>
-            </body>
-          </html>
-        `;
-
-        try {
-            await Print.printAsync({ html: htmlContent });
-        } catch (error) {
-            console.error("Error al abrir la interfaz de impresión:", error);
-        }
-    };
+   
 
     // Lógica para ejecutar la inserción en la base de datos
     const procederAGuardar = async () => {
@@ -229,12 +193,60 @@ export default function PlanificacionScreen() {
             Alert.alert("Éxito", "¡Plan de rotación guardado correctamente!");
 
             // Si Supabase devuelve el registro dentro de un arreglo, generamos el PDF automáticamente
-            if (resultado && resultado[0]) {
-                await imprimirPlanPDF(resultado[0]);
-            } else if (resultado && !Array.isArray(resultado)) {
-                // En caso de que el objeto devuelto no sea un arreglo sino la fila directa
-                await imprimirPlanPDF(resultado);
-            }
+ const htmlContent = `
+<html>
+<head>
+<style>
+body{
+font-family:Arial;
+padding:30px;
+}
+</style>
+</head>
+<body>
+
+<h1>
+Plan de Rotación
+</h1>
+
+<p>
+Departamento:
+${payload.department}
+</p>
+
+<p>
+Inicio:
+${payload.start_date}
+</p>
+
+<p>
+Fin:
+${payload.end_date}
+</p>
+
+<h3>
+Actividades
+</h3>
+
+<pre>
+${payload.activities}
+</pre>
+
+</body>
+</html>
+`;
+
+const pdfUrl =
+  await imprimirPlanPDF(
+    htmlContent,
+    1, // internship_id
+    1  // usuario
+  );
+
+console.log(
+  "PDF Guardado:",
+  pdfUrl
+);
 
         } catch (error: any) {
             console.error("🔴 Error completo al guardar en Supabase:");
